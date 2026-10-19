@@ -1,6 +1,6 @@
 # WatchFaceGT3 — Huawei Watch GT 3 için "Gün-Tarih" stili klasik analog kadran
 
-Güneş ışını (sunburst) kadran, yivli altın çerçeve, altın baton ibreler, 12'de gün adı penceresi, 3'te tarih penceresi, alt yarıda adım / nabız / pil. Kadran rengi altı seçenek: **siyah, sarı, mavi, yeşil, kırmızı, beyaz**. Sade bir AOD (sürekli açık ekran) varyantı vardır. Tüm katmanlar `build.py` ile üretilir; PNG'ler elle düzenlenmez. Marka logosu veya yazısı yoktur.
+Güneş ışını (sunburst) kadran, yivli altın çerçeve, altın baton ibreler, 12'de **M** monogramı, 3'te tarih penceresi, alt yarıda adım / nabız / pil. Kadran rengi altı seçenek: **siyah, sarı, mavi, yeşil, kırmızı, beyaz**. Sade bir AOD (sürekli açık ekran) varyantı vardır. Tüm katmanlar `build.py` ile üretilir; PNG'ler elle düzenlenmez. Marka logosu veya yazısı yoktur.
 
 | Aktif (yeşil) | Renkler + AOD |
 |---|---|
@@ -10,8 +10,8 @@ Güneş ışını (sunburst) kadran, yivli altın çerçeve, altın baton ibrele
 
 - Çözünürlük **466 × 466** (46 mm ve 42 mm modellerin ikisi de).
 - Kadran paket sürümü **2.1.z** zorunlu ("WATCH + GT series" modu).
-- Metin kontrolünde yalnız sistem fontları (Roboto) var; bu yüzden gün adları ve rakamlar **PNG** olarak üretildi.
-- AOD'de siyah olmayan piksel oranı **%10 altı ideal, %20 üstü reddedilir**. Bu tasarımda en kötü durumda **≈%4,2**. `build.py` çalışınca oranı yazdırır.
+- Metin kontrolünde yalnız sistem fontları (Roboto) var; bu yüzden rakamlar ve M logosu **PNG** olarak üretildi.
+- AOD'de siyah olmayan piksel oranı **%10 altı ideal, %20 üstü reddedilir**. Bu tasarımda en kötü durumda **≈%4**. `build.py` çalışınca oranı yazdırır.
 - Tek görsel ≤ 750 KB (en büyük katman ≈ 210 KB, sarı arka plan).
 - Dokunma kısayolları yalnız saatin yerleşik uygulamalarını açabilir.
 
@@ -33,14 +33,14 @@ katmanlar/aktif/
   simge_{adim,kalp,pil}_koyu.png    sarı/beyaz kadran için
   rakam_veri_altin/  rakam_veri_koyu/   0-9 + yuzde + iki_nokta  (13x28)
   rakam_tarih/       0-9 siyah (15x32) — tarih penceresi
-  gun/               gun_00_Paz … gun_06_Cmt (124x30, 0 = Pazar)
+  logo_m.png         M monogramı (72x72; arka plana zaten işlenmiş, ayrı katman istenirse)
 katmanlar/aod/
-  00_arka_plan.png  ibre_saat.png  ibre_dakika.png  merkez_kapak.png  rakam_tarih/  gun/
+  00_arka_plan.png  ibre_saat.png  ibre_dakika.png  merkez_kapak.png  rakam_tarih/
 onizleme/
   aktif_yesil_10_09.png  aod_10_09.png  renkler_ve_aod.png
 ```
 
-Renkler `KADRAN` sözlüğünde (merkez, kenar) olarak; konumlar `POS_GUN`, `POS_TARIH`, `VERI_X/VERI_Y` sabitlerinde. Değiştir → tekrar çalıştır.
+Renkler `KADRAN` sözlüğünde (merkez, kenar) olarak; konumlar `POS_LOGO`, `POS_TARIH`, `VERI_X/VERI_Y` sabitlerinde. Değiştir → tekrar çalıştır.
 
 ## Theme Studio'da birleştirme (.hwt üretimi)
 
@@ -50,14 +50,14 @@ Koordinatlar aşağıda **merkez** olarak verilir; Theme Studio sol-üst köşe 
 
 1. **New Project → Watch Face**. Device: *WATCH + GT series*, Resolution **466 × 466**, Version **2.1.z**. Proje adı: WatchFaceGT3.
 2. **Arka plan (renk seçimi)**: `Background` kontrolüne `00_arka_plan_yesil.png` yükle. Kullanıcının saatte rengi değiştirebilmesi için Theme Studio'nun **Style (stil değiştirme)** özelliğini kullan: arka plan kontrolünde *Style* ekle, her stile bir renk dosyasını ata (6 stil). Saatte kadrana uzun basınca *Stil* seçeneğinden renk değişir. Not: sarı ve beyaz stillerde veri simgeleri/rakamları için `_koyu` setini, diğerlerinde `_altin` setini aynı stil gruplarına bağla (simgeler ve veri sayıları da *Style*'a dahil edilir).
-3. **Gün adı**: `Image Sequence` kontrolü, veri *Week day*, `gun/` klasöründeki 7 dosya, merkez **(233,112)** → sol-üst (171,97). Dosya sırası **0 = Pazar … 6 = Cumartesi**; Theme Studio haftayı Pazartesi'den başlatıyorsa sırayı sürükleyerek düzelt, önizlemede bugünün adıyla doğrula.
+3. **M logosu**: arka plan PNG'lerine işlenmiştir, ayrıca katman gerekmez. (Değiştirmek istersen `logo_m.png` 72 × 72, merkez (233,118).)
 4. **Tarih**: `Image Number` kontrolü, `rakam_tarih/0-9`, veri *Day*, iki hane, hizalama *center*, merkez **(372,233)**.
 5. **Veri satırı** (y = 318): `Image` + `Image Number` (`rakam_veri_altin/`, hizalama center):
    - Adım: simge `simge_adim_*.png` merkez (110,318); sayı veri *Steps*, merkez (146,318). 5 haneye kadar sığar.
    - Nabız: simge `simge_kalp_*.png` (209,318); sayı veri *Heart rate*, merkez (239,318).
    - Pil: simge `simge_pil_*.png` (302,318); sayı veri *Battery*, merkez (334,318), son ek `yuzde.png`.
 6. **İbreler**: `Pointer` kontrolleri. Üç ibre PNG'si tam tuval (466 × 466), **saat 12'yi gösterir**, dönme merkezi **(233,233)**. `ibre_saat.png` (Hour), `ibre_dakika.png` (Minute), `ibre_saniye.png` (Second). En üste `merkez_kapak.png` `Image` olarak (0,0).
-7. **AOD**: Sol panelde *AOD* sekmesine geç; `katmanlar/aod/` dosyalarıyla arka plan, gün, tarih, saat ve dakika ibresi, merkez kapağı ekle (saniye ibresi ve veri satırı **yok**). Theme Studio'nun "AOD pixel ratio" uyarısı çıkmamalı (ölçüm ≈%4).
+7. **AOD**: Sol panelde *AOD* sekmesine geç; `katmanlar/aod/` dosyalarıyla arka plan, tarih, saat ve dakika ibresi, merkez kapağı ekle (saniye ibresi ve veri satırı **yok**). Theme Studio'nun "AOD pixel ratio" uyarısı çıkmamalı (ölçüm ≈%4).
 8. **Kapak görseli**: `onizleme/aktif_yesil_10_09.png`.
 9. **Build → Export** ile `.hwt` dosyasını üret.
 

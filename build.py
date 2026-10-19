@@ -3,7 +3,7 @@
 Huawei Watch GT 3 (466x466) — "Gün-Tarih" stili klasik analog kadran, katman üretici.
 
 Güneş ışını (sunburst) kadran, yivli altın çerçeve, altın baton ibreler,
-12'de gün adı penceresi, 3'te tarih penceresi, alt yarıda adım / nabız / pil.
+12'de M monogramı, 3'te tarih penceresi, alt yarıda adım / nabız / pil.
 Kadran rengi 6 varyant: siyah, sari, mavi, yesil, kirmizi, beyaz.
 
 Çalıştır:  python build.py
@@ -23,6 +23,7 @@ FONT_DIR = r"C:\Windows\Fonts"
 F_SERIF = os.path.join(FONT_DIR, "georgia.ttf")       # Roma rakamları
 F_SANS_B = os.path.join(FONT_DIR, "segoeuib.ttf")     # sayılar, gün adı
 F_SANS = os.path.join(FONT_DIR, "segoeui.ttf")
+F_LOGO = os.path.join(FONT_DIR, "georgiab.ttf")      # M logosu
 
 OUT = os.path.dirname(os.path.abspath(__file__))
 AKTIF = os.path.join(OUT, "katmanlar", "aktif")
@@ -51,13 +52,11 @@ KADRAN = {
 # Açık kadranlarda (sarı, beyaz) alt yarıdaki veri yazıları koyu set ile okunur
 KOYU_KADRANLAR = ("sari", "beyaz")
 
-GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"]  # 0 = Pazar
-GUN_KISA = ["Paz", "Pzt", "Sal", "Car", "Per", "Cum", "Cmt"]
 
 R_BEZEL_DIS, R_BEZEL_IC = 233, 212      # yivli çerçeve
 R_REHAUT = 204                           # iç eğik halka
-POS_GUN = (233, 112)                     # gün penceresi merkezi
-GUN_BOX = (124, 30)
+POS_LOGO = (233, 118)                    # M logosu merkezi
+LOGO_BOX = (72, 72)
 POS_TARIH = (372, 233)                   # tarih penceresi merkezi
 TARIH_BOX = (40, 32)
 VERI_Y = 318                             # adım / nabız / pil satırı
@@ -179,18 +178,37 @@ def bezel_ve_indeksler(koyu_yazi=False):
         d.line([cx + off * s, cy - 190 * s, cx + off * s, cy - 140 * s], fill=LUME, width=int(2.2 * s))
 
     # gün penceresi (12) ve tarih penceresi (3): beyaz zemin, altın çerçeve
-    for pos, box in ((POS_GUN, GUN_BOX), (POS_TARIH, TARIH_BOX)):
+    for pos, box in ((POS_TARIH, TARIH_BOX),):
         x0, y0 = (pos[0] - box[0] / 2) * s, (pos[1] - box[1] / 2) * s
         x1, y1 = (pos[0] + box[0] / 2) * s, (pos[1] + box[1] / 2) * s
         d.rounded_rectangle([x0 - 3 * s, y0 - 3 * s, x1 + 3 * s, y1 + 3 * s], radius=3 * s, fill=ALTIN)
         d.rounded_rectangle([x0 - 1 * s, y0 - 1 * s, x1 + 1 * s, y1 + 1 * s], radius=2 * s, fill=ALTIN_KOYU)
         d.rounded_rectangle([x0, y0, x1, y1], radius=1.5 * s, fill=BEYAZ)
 
+    # M logosu (altın, koyu kenar)
+    big.alpha_composite(logo_m(ALTIN, ALTIN_KOYU, s), (int(POS_LOGO[0] * s - LOGO_BOX[0] * s / 2),
+                                                     int(POS_LOGO[1] * s - LOGO_BOX[1] * s / 2)))
+    d = ImageDraw.Draw(big)
+
     # veri satırı ayraçları
     col = SIYAH if koyu_yazi else ALTIN
     for x in (186, 280):
         d.line([x * s, (VERI_Y - 12) * s, x * s, (VERI_Y + 12) * s], fill=col, width=int(1 * s))
     return down(big)
+
+
+def logo_m(col, kenar, s=1, outline=False):
+    """Georgia Bold 'M' monogramı, LOGO_BOX boyutunda (s: süperörnekleme)."""
+    img = Image.new("RGBA", (LOGO_BOX[0] * s, LOGO_BOX[1] * s), TRANSP)
+    d = ImageDraw.Draw(img)
+    f = font(F_LOGO, 56 * s)
+    if outline:
+        d.text((img.width / 2, img.height / 2), "M", font=f, fill=TRANSP, anchor="mm",
+               stroke_width=int(1.3 * s), stroke_fill=col)
+    else:
+        d.text((img.width / 2, img.height / 2), "M", font=f, fill=col, anchor="mm",
+               stroke_width=int(1.2 * s), stroke_fill=kenar)
+    return img
 
 
 def arka_plan(renk):
@@ -208,14 +226,16 @@ def baton_ibre(uzunluk, genislik, kuyruk, aod=False):
     d = ImageDraw.Draw(big)
     cx, cy = C[0] * s, C[1] * s
     L, Wd, T = uzunluk * s, genislik * s, kuyruk * s
-    pts = [(cx - Wd * 0.35, cy + T), (cx - Wd / 2, cy - L * 0.25), (cx - Wd / 2, cy - L + Wd * 0.8),
-           (cx, cy - L), (cx + Wd / 2, cy - L + Wd * 0.8), (cx + Wd / 2, cy - L * 0.25), (cx + Wd * 0.35, cy + T)]
+    # düz baton: gövde eşit genişlikte, uç hafif daralır, kuyruk dar
+    pts = [(cx - Wd * 0.3, cy + T), (cx - Wd * 0.3, cy - 14 * s), (cx - Wd / 2, cy - 22 * s),
+           (cx - Wd * 0.4, cy - L), (cx + Wd * 0.4, cy - L),
+           (cx + Wd / 2, cy - 22 * s), (cx + Wd * 0.3, cy - 14 * s), (cx + Wd * 0.3, cy + T)]
     if aod:
         d.polygon(pts, outline=AOD_ALTIN, width=int(1.6 * s))
         return down(big)
     d.polygon(pts, fill=ALTIN)
     d.polygon(pts, outline=ALTIN_KOYU, width=int(1.2 * s))
-    d.line([cx, cy - L * 0.2, cx, cy - L + Wd * 1.2], fill=LUME, width=int(Wd * 0.42))
+    d.rectangle([cx - Wd * 0.22, cy - L + 7 * s, cx + Wd * 0.22, cy - L * 0.42], fill=LUME)
     return down(big)
 
 
@@ -292,12 +312,6 @@ def rakam_seti(folder, col, size, bw, ekstra=True):
             save(img, folder, f"{name}.png")
 
 
-def gun_seti(folder, col, size=17, box=GUN_BOX):
-    f = font(F_SANS_B, size)
-    for i, t in enumerate(GUNLER):
-        img = Image.new("RGBA", box, TRANSP)
-        ImageDraw.Draw(img).text((box[0] / 2, box[1] / 2 + 1), tr_buyuk(t), font=f, fill=col, anchor="mm")
-        save(img, folder, f"gun_{i:02d}_{GUN_KISA[i]}.png")
 
 
 # ---------------------------------------------------------------- önizleme birleştirme
@@ -319,7 +333,7 @@ def dondur(img, deg):
     return img.rotate(-deg, resample=Image.BICUBIC, center=C)
 
 
-def onizleme_aktif(renk, saat, dk, sn, adim, nabiz, pil, gun, gunadi):
+def onizleme_aktif(renk, saat, dk, sn, adim, nabiz, pil, gun):
     base = Image.open(os.path.join(AKTIF, f"00_arka_plan_{renk}.png")).convert("RGBA")
     set_ = "koyu" if renk in KOYU_KADRANLAR else "altin"
     rk = os.path.join(AKTIF, "rakam_veri_" + set_)
@@ -329,7 +343,6 @@ def onizleme_aktif(renk, saat, dk, sn, adim, nabiz, pil, gun, gunadi):
     sayi_yaz(base, rk, str(nabiz), (VERI_X[1] + 6, VERI_Y))
     yerlestir(base, Image.open(os.path.join(AKTIF, f"simge_pil_{set_}.png")), (VERI_X[2] - 24, VERI_Y))
     sayi_yaz(base, rk, f"{pil}%", (VERI_X[2] + 8, VERI_Y))
-    yerlestir(base, Image.open(os.path.join(AKTIF, "gun", f"gun_{gunadi:02d}_{GUN_KISA[gunadi]}.png")), POS_GUN)
     sayi_yaz(base, os.path.join(AKTIF, "rakam_tarih"), f"{gun:02d}", POS_TARIH)
     h_deg = (saat % 12) * 30 + dk * 0.5
     base.alpha_composite(dondur(Image.open(os.path.join(AKTIF, "ibre_saat.png")), h_deg))
@@ -339,9 +352,8 @@ def onizleme_aktif(renk, saat, dk, sn, adim, nabiz, pil, gun, gunadi):
     return base
 
 
-def onizleme_aod(saat, dk, gun, gunadi):
+def onizleme_aod(saat, dk, gun):
     base = Image.open(os.path.join(AOD, "00_arka_plan.png")).convert("RGBA")
-    yerlestir(base, Image.open(os.path.join(AOD, "gun", f"gun_{gunadi:02d}_{GUN_KISA[gunadi]}.png")), POS_GUN)
     sayi_yaz(base, os.path.join(AOD, "rakam_tarih"), f"{gun:02d}", POS_TARIH)
     base.alpha_composite(dondur(Image.open(os.path.join(AOD, "ibre_saat.png")), (saat % 12) * 30 + dk * 0.5))
     base.alpha_composite(dondur(Image.open(os.path.join(AOD, "ibre_dakika.png")), dk * 6))
@@ -374,7 +386,10 @@ def aod_arka_plan():
     for off in (-7, 7):
         d.rectangle([(cx + off * s) - 3 * s, cy - 196 * s, (cx + off * s) + 3 * s, cy - 140 * s],
                     outline=AOD_ALTIN, width=int(1.3 * s))
-    for pos, box in ((POS_GUN, GUN_BOX), (POS_TARIH, TARIH_BOX)):
+    big.alpha_composite(logo_m(AOD_ALTIN, None, s, outline=True),
+                        (int(POS_LOGO[0] * s - LOGO_BOX[0] * s / 2), int(POS_LOGO[1] * s - LOGO_BOX[1] * s / 2)))
+    d = ImageDraw.Draw(big)
+    for pos, box in ((POS_TARIH, TARIH_BOX),):
         d.rounded_rectangle([(pos[0] - box[0] / 2) * s, (pos[1] - box[1] / 2) * s,
                              (pos[0] + box[0] / 2) * s, (pos[1] + box[1] / 2) * s],
                             radius=2 * s, outline=AOD_ALTIN, width=int(1.3 * s))
@@ -392,8 +407,8 @@ def main():
     # --- aktif katmanlar
     for renk in KADRAN:
         save(arka_plan(renk), AKTIF, f"00_arka_plan_{renk}.png")
-    save(baton_ibre(128, 13, 24), AKTIF, "ibre_saat.png")
-    save(baton_ibre(188, 11, 28), AKTIF, "ibre_dakika.png")
+    save(baton_ibre(122, 15, 22), AKTIF, "ibre_saat.png")
+    save(baton_ibre(192, 13, 26), AKTIF, "ibre_dakika.png")
     save(saniye_ibresi(), AKTIF, "ibre_saniye.png")
     save(merkez_kapak(), AKTIF, "merkez_kapak.png")
     for ad, col in (("altin", ALTIN), ("koyu", SIYAH)):
@@ -402,18 +417,17 @@ def main():
         save(simge_pil(col), AKTIF, f"simge_pil_{ad}.png")
         rakam_seti(os.path.join(AKTIF, f"rakam_veri_{ad}"), col, size=22, bw=13)
     rakam_seti(os.path.join(AKTIF, "rakam_tarih"), SIYAH, size=26, bw=15, ekstra=False)
-    gun_seti(os.path.join(AKTIF, "gun"), SIYAH)
+    save(logo_m(ALTIN, ALTIN_KOYU, 4).resize(LOGO_BOX, Image.LANCZOS), AKTIF, "logo_m.png")
 
     # --- AOD katmanları
     save(aod_arka_plan(), AOD, "00_arka_plan.png")
-    save(baton_ibre(128, 13, 24, aod=True), AOD, "ibre_saat.png")
-    save(baton_ibre(188, 11, 28, aod=True), AOD, "ibre_dakika.png")
+    save(baton_ibre(122, 15, 22, aod=True), AOD, "ibre_saat.png")
+    save(baton_ibre(192, 13, 26, aod=True), AOD, "ibre_dakika.png")
     save(merkez_kapak(aod=True), AOD, "merkez_kapak.png")
     rakam_seti(os.path.join(AOD, "rakam_tarih"), AOD_GRI, size=26, bw=15, ekstra=False)
-    gun_seti(os.path.join(AOD, "gun"), AOD_GRI)
 
     # --- önizlemeler
-    ornek = dict(gun=19, gunadi=1)                      # 19, Pazartesi
+    ornek = dict(gun=19)
     a1 = onizleme_aktif("yesil", 10, 9, 36, adim=6482, nabiz=72, pil=85, **ornek)
     a1.save(os.path.join(ONIZ, "aktif_yesil_10_09.png"))
     aod1 = onizleme_aod(10, 9, **ornek)
