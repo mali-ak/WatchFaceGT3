@@ -1,66 +1,84 @@
 # -*- coding: utf-8 -*-
 """
-Huawei Watch GT 3 (466x466) klasik analog kadran — katman üretici.
+Huawei Watch GT 3 (466x466) — "Gün-Tarih" stili klasik analog kadran, katman üretici.
+
+Güneş ışını (sunburst) kadran, yivli altın çerçeve, altın baton ibreler,
+12'de gün adı penceresi, 3'te tarih penceresi, alt yarıda adım / nabız / pil.
+Kadran rengi 6 varyant: siyah, sari, mavi, yesil, kirmizi, beyaz.
 
 Çalıştır:  python build.py
 Çıktı:     katmanlar/aktif/*  katmanlar/aod/*  onizleme/*.png
-
 Her şey bu dosyadan tekrar üretilir; PNG'leri elle düzenleme, burayı değiştir.
 """
 import math
 import os
 import shutil
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 # ---------------------------------------------------------------- sabitler
 W = H = 466
-C = (W // 2, H // 2)          # (233, 233) — tüm ibrelerin dönme merkezi
+C = (233, 233)                    # ibrelerin dönme merkezi
 FONT_DIR = r"C:\Windows\Fonts"
-F_SERIF = os.path.join(FONT_DIR, "georgia.ttf")       # rakamlar (klasik)
-F_SANS = os.path.join(FONT_DIR, "segoeuib.ttf")       # veri sayıları
-F_SANS_R = os.path.join(FONT_DIR, "segoeui.ttf")      # gün/ay adları
+F_SERIF = os.path.join(FONT_DIR, "georgia.ttf")       # Roma rakamları
+F_SANS_B = os.path.join(FONT_DIR, "segoeuib.ttf")     # sayılar, gün adı
+F_SANS = os.path.join(FONT_DIR, "segoeui.ttf")
 
 OUT = os.path.dirname(os.path.abspath(__file__))
 AKTIF = os.path.join(OUT, "katmanlar", "aktif")
 AOD = os.path.join(OUT, "katmanlar", "aod")
 ONIZ = os.path.join(OUT, "onizleme")
 
-# Renkler
-BG = (12, 14, 18, 255)
-DIAL_C = (24, 28, 35, 255)
-RING = (46, 52, 62, 255)
-WHITE = (236, 236, 236, 255)
-GOLD = (212, 168, 83, 255)
-GRAY = (138, 143, 153, 255)
-DIM = (70, 74, 82, 255)
-RED = (200, 55, 45, 255)
-AOD_W = (170, 170, 170, 255)
-AOD_D = (95, 95, 95, 255)
 TRANSP = (0, 0, 0, 0)
+ALTIN = (214, 176, 84, 255)
+ALTIN_ACIK = (246, 222, 140, 255)
+ALTIN_KOYU = (140, 104, 30, 255)
+BEYAZ = (248, 248, 246, 255)
+SIYAH = (18, 16, 12, 255)
+LUME = (236, 240, 230, 255)
+AOD_ALTIN = (120, 98, 44, 255)
+AOD_GRI = (105, 105, 105, 255)
 
-GUNLER = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]        # 0 = Pazar
-AYLAR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz",
-         "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+# Kadran renkleri: (merkez, kenar)
+KADRAN = {
+    "yesil":   ((44, 158, 84), (3, 44, 20)),
+    "siyah":   ((58, 60, 64), (6, 6, 8)),
+    "mavi":    ((46, 98, 196), (5, 20, 68)),
+    "kirmizi": ((196, 44, 44), (66, 6, 8)),
+    "sari":    ((238, 196, 70), (146, 102, 18)),
+    "beyaz":   ((252, 252, 250), (200, 200, 194)),
+}
+# Açık kadranlarda (sarı, beyaz) alt yarıdaki veri yazıları koyu set ile okunur
+KOYU_KADRANLAR = ("sari", "beyaz")
 
-# Veri konumları (merkez noktaları)
-POS_PIL = (233, 128)      # üst: pil
-POS_ADIM = (128, 233)     # sol: adım
-POS_NABIZ = (338, 233)    # sağ: nabız
-POS_TARIH = (233, 330)    # alt: gün + tarih
+GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"]  # 0 = Pazar
+GUN_KISA = ["Paz", "Pzt", "Sal", "Car", "Per", "Cum", "Cmt"]
+
+R_BEZEL_DIS, R_BEZEL_IC = 233, 212      # yivli çerçeve
+R_REHAUT = 204                           # iç eğik halka
+POS_GUN = (233, 112)                     # gün penceresi merkezi
+GUN_BOX = (124, 30)
+POS_TARIH = (372, 233)                   # tarih penceresi merkezi
+TARIH_BOX = (40, 32)
+VERI_Y = 318                             # adım / nabız / pil satırı
+VERI_X = (140, 233, 326)
 
 
 def font(path, size):
     return ImageFont.truetype(path, size)
 
 
-def new():
-    return Image.new("RGBA", (W, H), TRANSP)
-
-
-def polar(r, deg):
-    """Saat 12 = 0°, saat yönü. Merkeze göre piksel koordinatı."""
+def polar(r, deg, cx=C[0], cy=C[1]):
     a = math.radians(deg - 90)
-    return (C[0] + r * math.cos(a), C[1] + r * math.sin(a))
+    return (cx + r * math.cos(a), cy + r * math.sin(a))
+
+
+def ss(scale=4):
+    return Image.new("RGBA", (W * scale, H * scale), TRANSP), scale
+
+
+def down(img):
+    return img.resize((W, H), Image.LANCZOS)
 
 
 def save(img, folder, name):
@@ -68,101 +86,146 @@ def save(img, folder, name):
     img.save(os.path.join(folder, name), optimize=True)
 
 
-def ss(scale=4):
-    """Süperörnekleme için büyük tuval."""
-    return Image.new("RGBA", (W * scale, H * scale), TRANSP), scale
+def tr_buyuk(t):
+    return t.replace("i", "İ").replace("ı", "I").upper()
 
 
-def down(img, scale):
-    return img.resize((W, H), Image.LANCZOS)
+# ---------------------------------------------------------------- güneş ışını kadran
+def sunburst(merkez, kenar):
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    dx, dy = xx - C[0], yy - C[1]
+    r = np.sqrt(dx * dx + dy * dy) / R_REHAUT
+    r = np.clip(r, 0, 1)
+    ang = np.arctan2(dy, dx)
+    # radyal geçiş + ince açısal "fırça" çizgileri + hafif üst-sol parlama
+    t = r ** 1.15
+    isin = 1 + 0.03 * np.cos(ang * 72) + 0.015 * np.cos(ang * 7)
+    parlama = 1 + 0.10 * np.clip(np.cos(ang + math.radians(135)), 0, 1) * (1 - r)
+    m = np.array(merkez, np.float32)[None, None, :]
+    k = np.array(kenar, np.float32)[None, None, :]
+    rgb = (m * (1 - t[..., None]) + k * t[..., None]) * (isin * parlama)[..., None]
+    rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+    a = (r < 1).astype(np.uint8) * 255
+    img = Image.fromarray(np.dstack([rgb, a]), "RGBA")
+    return img
 
 
-# ---------------------------------------------------------------- arka plan
-def arka_plan():
-    img = Image.new("RGBA", (W, H), BG)
-    # yumuşak radyal gradyan
-    grad = Image.new("L", (W, H), 0)
-    gd = ImageDraw.Draw(grad)
-    for r in range(233, 0, -2):
-        v = int(255 * (1 - r / 233) ** 1.6)
-        gd.ellipse([C[0] - r, C[1] - r, C[0] + r, C[1] + r], fill=v)
-    dial = Image.new("RGBA", (W, H), DIAL_C)
-    img = Image.composite(dial, img, grad)
-
+# ---------------------------------------------------------------- çerçeve, halka, indeksler
+def bezel_ve_indeksler(koyu_yazi=False):
+    """Yivli altın çerçeve + rehaut + baton indeksler + pencere çerçeveleri."""
     big, s = ss()
     d = ImageDraw.Draw(big)
     cx, cy = C[0] * s, C[1] * s
 
-    # dış halka
-    d.ellipse([cx - 232 * s, cy - 232 * s, cx + 232 * s, cy + 232 * s],
-              outline=RING, width=3 * s)
-    d.ellipse([cx - 224 * s, cy - 224 * s, cx + 224 * s, cy + 224 * s],
-              outline=(30, 34, 42, 255), width=1 * s)
+    # yivli çerçeve: 72 yiv, dönüşümlü açık/koyu altın üçgenler
+    n = 96
+    for i in range(n):
+        a0, a1 = i * 360 / n, (i + 1) * 360 / n
+        am = (a0 + a1) / 2
+        col = ALTIN_ACIK if i % 2 == 0 else ALTIN_KOYU
+        p = [polar(R_BEZEL_DIS * s, a0, cx, cy), polar(R_BEZEL_DIS * s, a1, cx, cy),
+             polar(R_BEZEL_IC * s, am, cx, cy)]
+        d.polygon(p, fill=col)
+        col2 = ALTIN if i % 2 == 0 else ALTIN_ACIK
+        p2 = [polar(R_BEZEL_IC * s, a0, cx, cy), polar(R_BEZEL_IC * s, a1, cx, cy),
+              polar(R_BEZEL_DIS * s, am, cx, cy)]
+        d.polygon(p2, fill=col2)
+    # çerçeve kenar çizgileri
+    for rr, col, w in ((R_BEZEL_DIS - 1, ALTIN_KOYU, 2), (R_BEZEL_IC, ALTIN_KOYU, 2)):
+        d.ellipse([cx - rr * s, cy - rr * s, cx + rr * s, cy + rr * s], outline=col, width=w * s)
 
-    # dakika / saat çizgileri
+    # rehaut (eğik iç halka) + dakika çizgileri
+    d.ellipse([cx - R_BEZEL_IC * s, cy - R_BEZEL_IC * s, cx + R_BEZEL_IC * s, cy + R_BEZEL_IC * s],
+              fill=ALTIN_KOYU)
+    d.ellipse([cx - R_REHAUT * s, cy - R_REHAUT * s, cx + R_REHAUT * s, cy + R_REHAUT * s],
+              fill=(0, 0, 0, 0))
+    # rehaut'u delmek için ayrı katmanda çiz
+    reh = Image.new("RGBA", big.size, TRANSP)
+    rd = ImageDraw.Draw(reh)
+    rd.ellipse([cx - R_BEZEL_IC * s, cy - R_BEZEL_IC * s, cx + R_BEZEL_IC * s, cy + R_BEZEL_IC * s],
+               fill=(120, 92, 28, 255))
+    rd.ellipse([cx - R_REHAUT * s, cy - R_REHAUT * s, cx + R_REHAUT * s, cy + R_REHAUT * s],
+               fill=TRANSP)
     for i in range(60):
         deg = i * 6
-        if i % 5 == 0:
-            r0, r1, w, col = 200, 220, 4, WHITE
-            if i % 15 == 0:
-                col = GOLD
-        else:
-            r0, r1, w, col = 210, 220, 1.5, GRAY
-        p0 = polar(r0, deg)
-        p1 = polar(r1, deg)
-        d.line([p0[0] * s, p0[1] * s, p1[0] * s, p1[1] * s],
-               fill=col, width=int(w * s))
+        r0 = R_REHAUT if i % 5 else R_REHAUT - 2
+        p0, p1 = polar(r0 * s, deg, cx, cy), polar((R_BEZEL_IC - 1) * s, deg, cx, cy)
+        rd.line([*p0, *p1], fill=ALTIN_ACIK if i % 5 == 0 else (190, 150, 60, 255),
+                width=int((2.2 if i % 5 == 0 else 1.2) * s))
+    big = Image.alpha_composite(big, reh)
+    d = ImageDraw.Draw(big)
 
-    # 12 / 3 / 6 / 9 rakamları (Georgia)
-    f = font(F_SERIF, 46 * s)
-    for n, deg in ((12, 0), (3, 90), (6, 180), (9, 270)):
-        p = polar(178, deg)
-        d.text((p[0] * s, p[1] * s), str(n), font=f, fill=GOLD, anchor="mm")
+    # baton indeksler (12, 3, 6, 9 hariç) + lume çizgisi
+    for h in range(12):
+        if h in (0, 3, 6, 9):
+            continue
+        deg = h * 30
+        r0, r1, w = 160, 196, 9
+        pts = [polar(r0 * s, deg - 0.9, cx, cy), polar(r1 * s, deg - 0.9, cx, cy),
+               polar(r1 * s, deg + 0.9, cx, cy), polar(r0 * s, deg + 0.9, cx, cy)]
+        d.polygon(pts, fill=ALTIN)
+        d.line([*polar(r0 * s, deg, cx, cy), *polar(r1 * s, deg, cx, cy)], fill=ALTIN_KOYU, width=int(1.2 * s))
+        d.line([*polar((r0 + 6) * s, deg, cx, cy), *polar((r1 - 6) * s, deg, cx, cy)], fill=LUME, width=int(3 * s))
+    # VI ve IX Roma rakamları
+    f = font(F_SERIF, 40 * s)
+    for txt, deg in (("VI", 180), ("IX", 270)):
+        p = polar(176 * s, deg, cx, cy)
+        d.text(p, txt, font=f, fill=ALTIN, anchor="mm", stroke_width=int(0.8 * s), stroke_fill=ALTIN_KOYU)
+    # 12'de üçgen/çift baton
+    for off in (-7, 7):
+        pts = [((cx + off * s) - 3.5 * s, cy - 196 * s), ((cx + off * s) + 3.5 * s, cy - 196 * s),
+               ((cx + off * s) + 3.5 * s, cy - 134 * s), ((cx + off * s) - 3.5 * s, cy - 134 * s)]
+        d.polygon(pts, fill=ALTIN)
+        d.line([cx + off * s, cy - 190 * s, cx + off * s, cy - 140 * s], fill=LUME, width=int(2.2 * s))
 
-    # veri alanları için ince çerçeveli küçük "pencere" halkaları
-    for p in (POS_ADIM, POS_NABIZ):
-        r = 56
-        d.ellipse([(p[0] - r) * s, (p[1] - r) * s, (p[0] + r) * s, (p[1] + r) * s],
-                  outline=RING, width=2 * s)
+    # gün penceresi (12) ve tarih penceresi (3): beyaz zemin, altın çerçeve
+    for pos, box in ((POS_GUN, GUN_BOX), (POS_TARIH, TARIH_BOX)):
+        x0, y0 = (pos[0] - box[0] / 2) * s, (pos[1] - box[1] / 2) * s
+        x1, y1 = (pos[0] + box[0] / 2) * s, (pos[1] + box[1] / 2) * s
+        d.rounded_rectangle([x0 - 3 * s, y0 - 3 * s, x1 + 3 * s, y1 + 3 * s], radius=3 * s, fill=ALTIN)
+        d.rounded_rectangle([x0 - 1 * s, y0 - 1 * s, x1 + 1 * s, y1 + 1 * s], radius=2 * s, fill=ALTIN_KOYU)
+        d.rounded_rectangle([x0, y0, x1, y1], radius=1.5 * s, fill=BEYAZ)
 
-    # tarih penceresi çizgisi
-    x, y = POS_TARIH
-    d.line([(x - 60) * s, (y - 24) * s, (x + 60) * s, (y - 24) * s], fill=RING, width=1 * s)
-    d.line([(x - 60) * s, (y + 24) * s, (x + 60) * s, (y + 24) * s], fill=RING, width=1 * s)
+    # veri satırı ayraçları
+    col = SIYAH if koyu_yazi else ALTIN
+    for x in (186, 280):
+        d.line([x * s, (VERI_Y - 12) * s, x * s, (VERI_Y + 12) * s], fill=col, width=int(1 * s))
+    return down(big)
 
-    img.alpha_composite(down(big, s))
+
+def arka_plan(renk):
+    merkez, kenar = KADRAN[renk]
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+    img.alpha_composite(sunburst(merkez, kenar))
+    img.alpha_composite(bezel_ve_indeksler(koyu_yazi=renk in KOYU_KADRANLAR))
     return img
 
 
 # ---------------------------------------------------------------- ibreler
-def ibre(uzunluk, genislik, kuyruk, renk, orta=None, aod=False):
-    """Saat 12'yi gösteren ibre; tuval 466x466, pivot (233,233)."""
+def baton_ibre(uzunluk, genislik, kuyruk, aod=False):
+    """Altın baton ibre, ortasında lume şeridi. Saat 12'yi gösterir, pivot (233,233)."""
     big, s = ss()
     d = ImageDraw.Draw(big)
     cx, cy = C[0] * s, C[1] * s
     L, Wd, T = uzunluk * s, genislik * s, kuyruk * s
+    pts = [(cx - Wd * 0.35, cy + T), (cx - Wd / 2, cy - L * 0.25), (cx - Wd / 2, cy - L + Wd * 0.8),
+           (cx, cy - L), (cx + Wd / 2, cy - L + Wd * 0.8), (cx + Wd / 2, cy - L * 0.25), (cx + Wd * 0.35, cy + T)]
     if aod:
-        # ince dış çizgi, içi boş
-        pts = [(cx - Wd / 2, cy + T), (cx - Wd / 2, cy - L + Wd),
-               (cx, cy - L), (cx + Wd / 2, cy - L + Wd), (cx + Wd / 2, cy + T)]
-        d.polygon(pts, outline=renk, width=int(1.6 * s))
-    else:
-        # sivri uçlu gövde
-        pts = [(cx - Wd / 2, cy + T), (cx - Wd / 2, cy - L + Wd * 1.6),
-               (cx, cy - L), (cx + Wd / 2, cy - L + Wd * 1.6), (cx + Wd / 2, cy + T)]
-        d.polygon(pts, fill=renk)
-        if orta:
-            d.line([cx, cy - L + Wd * 2.2, cx, cy - 10 * s], fill=orta, width=int(Wd * 0.35))
-    return down(big, s)
+        d.polygon(pts, outline=AOD_ALTIN, width=int(1.6 * s))
+        return down(big)
+    d.polygon(pts, fill=ALTIN)
+    d.polygon(pts, outline=ALTIN_KOYU, width=int(1.2 * s))
+    d.line([cx, cy - L * 0.2, cx, cy - L + Wd * 1.2], fill=LUME, width=int(Wd * 0.42))
+    return down(big)
 
 
 def saniye_ibresi():
     big, s = ss()
     d = ImageDraw.Draw(big)
     cx, cy = C[0] * s, C[1] * s
-    d.line([cx, cy + 45 * s, cx, cy - 200 * s], fill=RED, width=int(2.4 * s))
-    d.ellipse([cx - 7 * s, cy + 30 * s, cx + 7 * s, cy + 44 * s], fill=RED)
-    return down(big, s)
+    d.line([cx, cy + 50 * s, cx, cy - 198 * s], fill=ALTIN, width=int(2.2 * s))
+    d.ellipse([cx - 6 * s, cy + 36 * s, cx + 6 * s, cy + 48 * s], fill=ALTIN)
+    return down(big)
 
 
 def merkez_kapak(aod=False):
@@ -170,112 +233,85 @@ def merkez_kapak(aod=False):
     d = ImageDraw.Draw(big)
     cx, cy = C[0] * s, C[1] * s
     if aod:
-        d.ellipse([cx - 5 * s, cy - 5 * s, cx + 5 * s, cy + 5 * s], outline=AOD_W, width=int(1.5 * s))
+        d.ellipse([cx - 5 * s, cy - 5 * s, cx + 5 * s, cy + 5 * s], outline=AOD_ALTIN, width=int(1.5 * s))
     else:
-        d.ellipse([cx - 9 * s, cy - 9 * s, cx + 9 * s, cy + 9 * s], fill=GOLD)
-        d.ellipse([cx - 3 * s, cy - 3 * s, cx + 3 * s, cy + 3 * s], fill=BG)
-    return down(big, s)
+        d.ellipse([cx - 9 * s, cy - 9 * s, cx + 9 * s, cy + 9 * s], fill=ALTIN, outline=ALTIN_KOYU, width=s)
+        d.ellipse([cx - 3 * s, cy - 3 * s, cx + 3 * s, cy + 3 * s], fill=ALTIN_ACIK)
+    return down(big)
 
 
-# ---------------------------------------------------------------- simgeler
+# ---------------------------------------------------------------- simgeler (24x24)
+def crop_box(img, size):
+    x0, y0 = C[0] - size // 2, C[1] - size // 2
+    return img.crop((x0, y0, x0 + size, y0 + size))
+
+
 def simge_adim(col):
     big, s = ss()
     d = ImageDraw.Draw(big)
-    # iki ayak izi (basit)
-    for dx, dy in ((-7, 0), (7, -9)):
+    for dx, dy in ((-4.5, 1), (4.5, -5)):
         x, y = (233 + dx) * s, (233 + dy) * s
-        d.ellipse([x - 4 * s, y - 2 * s, x + 4 * s, y + 10 * s], fill=col)
-        d.ellipse([x - 3.5 * s, y - 10 * s, x + 3.5 * s, y - 3 * s], fill=col)
-    return crop_box(down(big, s), 40)
+        d.ellipse([x - 2.6 * s, y - 1 * s, x + 2.6 * s, y + 7 * s], fill=col)
+        d.ellipse([x - 2.3 * s, y - 6.5 * s, x + 2.3 * s, y - 2 * s], fill=col)
+    return crop_box(down(big), 24)
 
 
 def simge_kalp(col):
     big, s = ss()
     d = ImageDraw.Draw(big)
     cx, cy = 233 * s, 233 * s
-    r = 7 * s
-    d.ellipse([cx - 2 * r, cy - r - 4 * s, cx, cy + r - 4 * s], fill=col)
-    d.ellipse([cx, cy - r - 4 * s, cx + 2 * r, cy + r - 4 * s], fill=col)
-    d.polygon([(cx - 2 * r + 1 * s, cy - 1 * s), (cx + 2 * r - 1 * s, cy - 1 * s),
-               (cx, cy + 14 * s)], fill=col)
-    return crop_box(down(big, s), 40)
+    r = 4.4 * s
+    d.ellipse([cx - 2 * r, cy - r - 3 * s, cx, cy + r - 3 * s], fill=col)
+    d.ellipse([cx, cy - r - 3 * s, cx + 2 * r, cy + r - 3 * s], fill=col)
+    d.polygon([(cx - 2 * r + 0.6 * s, cy - 1 * s), (cx + 2 * r - 0.6 * s, cy - 1 * s), (cx, cy + 9 * s)], fill=col)
+    return crop_box(down(big), 24)
 
 
 def simge_pil(col):
     big, s = ss()
     d = ImageDraw.Draw(big)
     cx, cy = 233 * s, 233 * s
-    d.rounded_rectangle([cx - 13 * s, cy - 7 * s, cx + 11 * s, cy + 7 * s],
-                        radius=3 * s, outline=col, width=int(2 * s))
-    d.rounded_rectangle([cx + 12 * s, cy - 3 * s, cx + 15 * s, cy + 3 * s], radius=1 * s, fill=col)
-    d.rounded_rectangle([cx - 10 * s, cy - 4 * s, cx + 4 * s, cy + 4 * s], radius=1 * s, fill=col)
-    return crop_box(down(big, s), 40)
-
-
-def crop_box(img, size):
-    """466 tuvalin ortasından size x size kare kırp (simge dosyaları için)."""
-    x0, y0 = C[0] - size // 2, C[1] - size // 2
-    return img.crop((x0, y0, x0 + size, y0 + size))
+    d.rounded_rectangle([cx - 9 * s, cy - 5 * s, cx + 7 * s, cy + 5 * s], radius=2 * s, outline=col, width=int(1.6 * s))
+    d.rounded_rectangle([cx + 8 * s, cy - 2 * s, cx + 10 * s, cy + 2 * s], radius=1 * s, fill=col)
+    d.rounded_rectangle([cx - 7 * s, cy - 3 * s, cx + 2 * s, cy + 3 * s], radius=1 * s, fill=col)
+    return crop_box(down(big), 24)
 
 
 # ---------------------------------------------------------------- rakam / metin setleri
-def rakam_seti(folder, col, size=27, bw=17):
-    """0-9 eşit genişlikli PNG'ler (Theme Studio 'Image Number' için)."""
-    f = font(F_SANS, size)
+def rakam_seti(folder, col, size, bw, ekstra=True):
+    f = font(F_SANS_B, size)
+    h = size + 6
     for n in range(10):
-        img = Image.new("RGBA", (bw, size + 6), TRANSP)
-        d = ImageDraw.Draw(img)
-        d.text((bw / 2, (size + 6) / 2), str(n), font=f, fill=col, anchor="mm")
+        img = Image.new("RGBA", (bw, h), TRANSP)
+        ImageDraw.Draw(img).text((bw / 2, h / 2), str(n), font=f, fill=col, anchor="mm")
         save(img, folder, f"{n}.png")
-    # yüzde ve iki nokta işaretleri de gerekebilir
-    for ch, name in ((":", "iki_nokta"), ("%", "yuzde")):
-        img = Image.new("RGBA", (bw, size + 6), TRANSP)
-        ImageDraw.Draw(img).text((bw / 2, (size + 6) / 2), ch, font=f, fill=col, anchor="mm")
-        save(img, folder, f"{name}.png")
+    if ekstra:
+        for ch, name in ((":", "iki_nokta"), ("%", "yuzde")):
+            img = Image.new("RGBA", (bw, h), TRANSP)
+            ImageDraw.Draw(img).text((bw / 2, h / 2), ch, font=f, fill=col, anchor="mm")
+            save(img, folder, f"{name}.png")
 
 
-def tr_buyuk(t):
-    return t.replace("i", "İ").replace("ı", "I").upper()
-
-
-def metin_seti(folder, prefix, liste, col, size=24, box=(64, 32)):
-    f = font(F_SANS_R, size)
-    for i, t in enumerate(liste):
+def gun_seti(folder, col, size=17, box=GUN_BOX):
+    f = font(F_SANS_B, size)
+    for i, t in enumerate(GUNLER):
         img = Image.new("RGBA", box, TRANSP)
-        ImageDraw.Draw(img).text((box[0] / 2, box[1] / 2), tr_buyuk(t), font=f, fill=col, anchor="mm")
-        save(img, folder, f"{prefix}_{i:02d}_{t}.png")
-
-
-# ---------------------------------------------------------------- pil yayı (11 kare)
-def pil_yay(folder, yuzde, col_on, col_off):
-    """Pil için 0..100 arası 11 kare; üstte 12 rakamının altında kısa yay."""
-    big, s = ss()
-    d = ImageDraw.Draw(big)
-    r = 36
-    box = [(POS_PIL[0] - r) * s, (POS_PIL[1] - r) * s, (POS_PIL[0] + r) * s, (POS_PIL[1] + r) * s]
-    start, span = 135, 270           # alt kısım açık, 270° yay
-    d.arc(box, start, start + span, fill=col_off, width=int(3 * s))
-    if yuzde > 0:
-        d.arc(box, start, start + span * yuzde / 100, fill=col_on, width=int(3 * s))
-    img = down(big, s)
-    save(img, folder, f"pil_yay_{yuzde:03d}.png")
-    return img
+        ImageDraw.Draw(img).text((box[0] / 2, box[1] / 2 + 1), tr_buyuk(t), font=f, fill=col, anchor="mm")
+        save(img, folder, f"gun_{i:02d}_{GUN_KISA[i]}.png")
 
 
 # ---------------------------------------------------------------- önizleme birleştirme
 def yerlestir(base, img, merkez):
-    base.alpha_composite(img, (int(merkez[0] - img.width / 2), int(merkez[1] - img.height / 2)))
+    base.alpha_composite(img, (int(round(merkez[0] - img.width / 2)), int(round(merkez[1] - img.height / 2))))
 
 
 def sayi_yaz(base, folder, text, merkez):
-    imgs = []
-    for ch in text:
-        name = {":": "iki_nokta", "%": "yuzde"}.get(ch, ch)
-        imgs.append(Image.open(os.path.join(folder, f"{name}.png")).convert("RGBA"))
+    imgs = [Image.open(os.path.join(folder, f"{ {':': 'iki_nokta', '%': 'yuzde'}.get(ch, ch)}.png")).convert("RGBA")
+            for ch in text]
     total = sum(i.width for i in imgs)
     x = merkez[0] - total / 2
     for i in imgs:
-        base.alpha_composite(i, (int(x), int(merkez[1] - i.height / 2)))
+        base.alpha_composite(i, (int(round(x)), int(round(merkez[1] - i.height / 2))))
         x += i.width
 
 
@@ -283,52 +319,37 @@ def dondur(img, deg):
     return img.rotate(-deg, resample=Image.BICUBIC, center=C)
 
 
-def onizleme_aktif(saat, dk, sn, adim, nabiz, pil, gun, ay, gunadi):
-    base = Image.open(os.path.join(AKTIF, "00_arka_plan.png")).convert("RGBA")
-    base.alpha_composite(Image.open(os.path.join(AKTIF, "pil", f"pil_yay_{round(pil/10)*10:03d}.png")))
-    # simgeler
-    yerlestir(base, Image.open(os.path.join(AKTIF, "simge_pil.png")), (POS_PIL[0], POS_PIL[1] - 16))
-    yerlestir(base, Image.open(os.path.join(AKTIF, "simge_adim.png")), (POS_ADIM[0], POS_ADIM[1] - 22))
-    yerlestir(base, Image.open(os.path.join(AKTIF, "simge_kalp.png")), (POS_NABIZ[0], POS_NABIZ[1] - 22))
-    rk = os.path.join(AKTIF, "rakam")
-    sayi_yaz(base, rk, f"{pil}%", (POS_PIL[0], POS_PIL[1] + 10))
-    sayi_yaz(base, rk, str(adim), (POS_ADIM[0], POS_ADIM[1] + 14))
-    sayi_yaz(base, rk, str(nabiz), (POS_NABIZ[0], POS_NABIZ[1] + 14))
-    # tarih: GÜN  13 EKİ
-    gimg = Image.open(os.path.join(AKTIF, "gun", f"gun_{gunadi:02d}_{GUNLER[gunadi]}.png"))
-    aimg = Image.open(os.path.join(AKTIF, "ay", f"ay_{ay:02d}_{AYLAR[ay]}.png"))
-    yerlestir(base, gimg, (POS_TARIH[0] - 48, POS_TARIH[1]))
-    sayi_yaz(base, rk, f"{gun:02d}", (POS_TARIH[0] + 6, POS_TARIH[1]))
-    yerlestir(base, aimg, (POS_TARIH[0] + 52, POS_TARIH[1]))
-    # ibreler
+def onizleme_aktif(renk, saat, dk, sn, adim, nabiz, pil, gun, gunadi):
+    base = Image.open(os.path.join(AKTIF, f"00_arka_plan_{renk}.png")).convert("RGBA")
+    set_ = "koyu" if renk in KOYU_KADRANLAR else "altin"
+    rk = os.path.join(AKTIF, "rakam_veri_" + set_)
+    yerlestir(base, Image.open(os.path.join(AKTIF, f"simge_adim_{set_}.png")), (VERI_X[0] - 30, VERI_Y))
+    sayi_yaz(base, rk, str(adim), (VERI_X[0] + 6, VERI_Y))
+    yerlestir(base, Image.open(os.path.join(AKTIF, f"simge_kalp_{set_}.png")), (VERI_X[1] - 24, VERI_Y))
+    sayi_yaz(base, rk, str(nabiz), (VERI_X[1] + 6, VERI_Y))
+    yerlestir(base, Image.open(os.path.join(AKTIF, f"simge_pil_{set_}.png")), (VERI_X[2] - 24, VERI_Y))
+    sayi_yaz(base, rk, f"{pil}%", (VERI_X[2] + 8, VERI_Y))
+    yerlestir(base, Image.open(os.path.join(AKTIF, "gun", f"gun_{gunadi:02d}_{GUN_KISA[gunadi]}.png")), POS_GUN)
+    sayi_yaz(base, os.path.join(AKTIF, "rakam_tarih"), f"{gun:02d}", POS_TARIH)
     h_deg = (saat % 12) * 30 + dk * 0.5
-    m_deg = dk * 6 + sn * 0.1
-    s_deg = sn * 6
     base.alpha_composite(dondur(Image.open(os.path.join(AKTIF, "ibre_saat.png")), h_deg))
-    base.alpha_composite(dondur(Image.open(os.path.join(AKTIF, "ibre_dakika.png")), m_deg))
-    base.alpha_composite(dondur(Image.open(os.path.join(AKTIF, "ibre_saniye.png")), s_deg))
+    base.alpha_composite(dondur(Image.open(os.path.join(AKTIF, "ibre_dakika.png")), dk * 6 + sn * 0.1))
+    base.alpha_composite(dondur(Image.open(os.path.join(AKTIF, "ibre_saniye.png")), sn * 6))
     base.alpha_composite(Image.open(os.path.join(AKTIF, "merkez_kapak.png")))
     return base
 
 
-def onizleme_aod(saat, dk, gun, ay, gunadi):
+def onizleme_aod(saat, dk, gun, gunadi):
     base = Image.open(os.path.join(AOD, "00_arka_plan.png")).convert("RGBA")
-    rk = os.path.join(AOD, "rakam")
-    gimg = Image.open(os.path.join(AOD, "gun", f"gun_{gunadi:02d}_{GUNLER[gunadi]}.png"))
-    aimg = Image.open(os.path.join(AOD, "ay", f"ay_{ay:02d}_{AYLAR[ay]}.png"))
-    yerlestir(base, gimg, (POS_TARIH[0] - 48, POS_TARIH[1]))
-    sayi_yaz(base, rk, f"{gun:02d}", (POS_TARIH[0] + 6, POS_TARIH[1]))
-    yerlestir(base, aimg, (POS_TARIH[0] + 52, POS_TARIH[1]))
-    h_deg = (saat % 12) * 30 + dk * 0.5
-    m_deg = dk * 6
-    base.alpha_composite(dondur(Image.open(os.path.join(AOD, "ibre_saat.png")), h_deg))
-    base.alpha_composite(dondur(Image.open(os.path.join(AOD, "ibre_dakika.png")), m_deg))
+    yerlestir(base, Image.open(os.path.join(AOD, "gun", f"gun_{gunadi:02d}_{GUN_KISA[gunadi]}.png")), POS_GUN)
+    sayi_yaz(base, os.path.join(AOD, "rakam_tarih"), f"{gun:02d}", POS_TARIH)
+    base.alpha_composite(dondur(Image.open(os.path.join(AOD, "ibre_saat.png")), (saat % 12) * 30 + dk * 0.5))
+    base.alpha_composite(dondur(Image.open(os.path.join(AOD, "ibre_dakika.png")), dk * 6))
     base.alpha_composite(Image.open(os.path.join(AOD, "merkez_kapak.png")))
     return base
 
 
 def yanan_oran(img, esik=8):
-    """Siyah olmayan piksel oranı (AOD kuralı: <%10 ideal, >%20 ret)."""
     g = img.convert("RGB").convert("L").point(lambda v: 255 if v > esik else 0)
     return g.histogram()[255] / (W * H)
 
@@ -337,17 +358,28 @@ def yanan_oran(img, esik=8):
 def aod_arka_plan():
     big, s = ss()
     d = ImageDraw.Draw(big)
-    for i in range(12):
-        deg = i * 30
-        p0, p1 = polar(206, deg), polar(220, deg)
-        col = AOD_W if i % 3 == 0 else AOD_D
-        d.line([p0[0] * s, p0[1] * s, p1[0] * s, p1[1] * s], fill=col, width=int(2 * s))
-    f = font(F_SERIF, 40 * s)
-    for n, deg in ((12, 0), (3, 90), (6, 180), (9, 270)):
-        p = polar(178, deg)
-        d.text((p[0] * s, p[1] * s), str(n), font=f, fill=AOD_D, anchor="mm")
+    cx, cy = C[0] * s, C[1] * s
+    d.ellipse([cx - R_BEZEL_IC * s, cy - R_BEZEL_IC * s, cx + R_BEZEL_IC * s, cy + R_BEZEL_IC * s],
+              outline=AOD_ALTIN, width=int(1.5 * s))
+    for h in range(12):
+        deg = h * 30
+        if h in (0, 3, 6, 9):
+            continue
+        pts = [polar(166 * s, deg - 0.8, cx, cy), polar(196 * s, deg - 0.8, cx, cy),
+               polar(196 * s, deg + 0.8, cx, cy), polar(166 * s, deg + 0.8, cx, cy)]
+        d.polygon(pts, outline=AOD_ALTIN, width=int(1.3 * s))
+    f = font(F_SERIF, 36 * s)
+    for txt, deg in (("VI", 180), ("IX", 270)):
+        d.text(polar(176 * s, deg, cx, cy), txt, font=f, fill=AOD_ALTIN, anchor="mm")
+    for off in (-7, 7):
+        d.rectangle([(cx + off * s) - 3 * s, cy - 196 * s, (cx + off * s) + 3 * s, cy - 140 * s],
+                    outline=AOD_ALTIN, width=int(1.3 * s))
+    for pos, box in ((POS_GUN, GUN_BOX), (POS_TARIH, TARIH_BOX)):
+        d.rounded_rectangle([(pos[0] - box[0] / 2) * s, (pos[1] - box[1] / 2) * s,
+                             (pos[0] + box[0] / 2) * s, (pos[1] + box[1] / 2) * s],
+                            radius=2 * s, outline=AOD_ALTIN, width=int(1.3 * s))
     img = Image.new("RGBA", (W, H), (0, 0, 0, 255))
-    img.alpha_composite(down(big, s))
+    img.alpha_composite(down(big))
     return img
 
 
@@ -358,47 +390,45 @@ def main():
         os.makedirs(p, exist_ok=True)
 
     # --- aktif katmanlar
-    save(arka_plan(), AKTIF, "00_arka_plan.png")
-    save(ibre(118, 11, 22, WHITE, orta=GOLD), AKTIF, "ibre_saat.png")
-    save(ibre(172, 8, 26, WHITE, orta=GOLD), AKTIF, "ibre_dakika.png")
+    for renk in KADRAN:
+        save(arka_plan(renk), AKTIF, f"00_arka_plan_{renk}.png")
+    save(baton_ibre(128, 13, 24), AKTIF, "ibre_saat.png")
+    save(baton_ibre(188, 11, 28), AKTIF, "ibre_dakika.png")
     save(saniye_ibresi(), AKTIF, "ibre_saniye.png")
     save(merkez_kapak(), AKTIF, "merkez_kapak.png")
-    save(simge_adim(GOLD), AKTIF, "simge_adim.png")
-    save(simge_kalp(RED), AKTIF, "simge_kalp.png")
-    save(simge_pil(GOLD), AKTIF, "simge_pil.png")
-    rakam_seti(os.path.join(AKTIF, "rakam"), WHITE)
-    metin_seti(os.path.join(AKTIF, "gun"), "gun", GUNLER, GOLD)
-    metin_seti(os.path.join(AKTIF, "ay"), "ay", AYLAR, GOLD)
-    for y in range(0, 101, 10):
-        pil_yay(os.path.join(AKTIF, "pil"), y, GOLD, RING)
+    for ad, col in (("altin", ALTIN), ("koyu", SIYAH)):
+        save(simge_adim(col), AKTIF, f"simge_adim_{ad}.png")
+        save(simge_kalp(col), AKTIF, f"simge_kalp_{ad}.png")
+        save(simge_pil(col), AKTIF, f"simge_pil_{ad}.png")
+        rakam_seti(os.path.join(AKTIF, f"rakam_veri_{ad}"), col, size=22, bw=13)
+    rakam_seti(os.path.join(AKTIF, "rakam_tarih"), SIYAH, size=26, bw=15, ekstra=False)
+    gun_seti(os.path.join(AKTIF, "gun"), SIYAH)
 
     # --- AOD katmanları
     save(aod_arka_plan(), AOD, "00_arka_plan.png")
-    save(ibre(118, 11, 22, AOD_W, aod=True), AOD, "ibre_saat.png")
-    save(ibre(172, 8, 26, AOD_W, aod=True), AOD, "ibre_dakika.png")
+    save(baton_ibre(128, 13, 24, aod=True), AOD, "ibre_saat.png")
+    save(baton_ibre(188, 11, 28, aod=True), AOD, "ibre_dakika.png")
     save(merkez_kapak(aod=True), AOD, "merkez_kapak.png")
-    rakam_seti(os.path.join(AOD, "rakam"), AOD_D)
-    metin_seti(os.path.join(AOD, "gun"), "gun", GUNLER, AOD_D)
-    metin_seti(os.path.join(AOD, "ay"), "ay", AYLAR, AOD_D)
+    rakam_seti(os.path.join(AOD, "rakam_tarih"), AOD_GRI, size=26, bw=15, ekstra=False)
+    gun_seti(os.path.join(AOD, "gun"), AOD_GRI)
 
     # --- önizlemeler
-    ornek = dict(gun=19, ay=9, gunadi=1)            # 19 Eki, Pazartesi
-    a1 = onizleme_aktif(10, 9, 36, adim=6482, nabiz=72, pil=85, **ornek)
-    a1.save(os.path.join(ONIZ, "aktif_10_09.png"))
-    a2 = onizleme_aktif(16, 42, 12, adim=11205, nabiz=118, pil=40, **ornek)
-    a2.save(os.path.join(ONIZ, "aktif_16_42.png"))
+    ornek = dict(gun=19, gunadi=1)                      # 19, Pazartesi
+    a1 = onizleme_aktif("yesil", 10, 9, 36, adim=6482, nabiz=72, pil=85, **ornek)
+    a1.save(os.path.join(ONIZ, "aktif_yesil_10_09.png"))
     aod1 = onizleme_aod(10, 9, **ornek)
     aod1.save(os.path.join(ONIZ, "aod_10_09.png"))
-    # Theme Studio küçük kapak görseli (kadran listesinde görünen) için 466 kare yeterli;
-    # yan yana karşılaştırma:
-    yan = Image.new("RGBA", (W * 3 + 40, H), (30, 30, 30, 255))
-    yan.alpha_composite(a1, (0, 0)); yan.alpha_composite(a2, (W + 20, 0)); yan.alpha_composite(aod1, (2 * W + 40, 0))
-    yan.save(os.path.join(ONIZ, "yan_yana.png"))
+    # 6 renk + AOD: 3x3 ızgara yarım boyutta
+    hucre = W // 2 + 8
+    izg = Image.new("RGBA", (hucre * 4, hucre * 2), (28, 28, 28, 255))
+    kareler = [onizleme_aktif(r, 10, 9, 36, adim=11205, nabiz=118, pil=40, **ornek) for r in KADRAN] + [aod1]
+    for i, k in enumerate(kareler):
+        izg.alpha_composite(k.resize((W // 2, H // 2), Image.LANCZOS), ((i % 4) * hucre + 4, (i // 4) * hucre + 4))
+    izg.save(os.path.join(ONIZ, "renkler_ve_aod.png"))
 
-    # --- AOD piksel oranı (en kötü durum: ibreler 10:09 + tarih)
+    # --- AOD piksel oranı
     en_kotu = max(yanan_oran(onizleme_aod(h, m, **ornek)) for h, m in ((10, 9), (6, 30), (12, 0), (3, 45)))
     print(f"AOD yanan piksel oranı (en kötü örnek): %{en_kotu*100:.2f}  (hedef <%10, sınır %20)")
-    # boyut kontrolü
     en_buyuk = max((os.path.getsize(os.path.join(r, f)), os.path.join(r, f))
                    for r, _, fs in os.walk(os.path.join(OUT, "katmanlar")) for f in fs)
     print(f"En büyük katman: {en_buyuk[0]/1024:.0f} KB  {os.path.relpath(en_buyuk[1], OUT)}  (sınır 750 KB)")
