@@ -95,6 +95,12 @@ Huawei tasarımcı başvurusu için birbirinden farklı beş kadran gerekir. Kla
 | Halka | `tasarimlar/spor_halka.py` | Üç ilerleme halkası (adım/nabız/pil), spor | `katmanlar_halka/` |
 | Retro | `tasarimlar/retro_lcd.py` | Turuncu çerçeve, yeşil LCD, yedi parçalı rakam | `katmanlar_retro/` |
 | Prizma | `tasarimlar/geometrik.py` | Dört renkli dilim, koyu disk, beyaz ibreler | `katmanlar_prizma/` |
+| Gece | `tasarimlar/gece.py` | Mat siyah, gümüş baton, dauphine ibre, 6'da küçük saniye | `katmanlar_gece/` |
+| Porselen | `tasarimlar/porselen.py` | Beyaz emaye, Roma rakamları, demiryolu ray, mavi çelik yaprak ibre | `katmanlar_porselen/` |
+| Giyoş | `tasarimlar/giyos.py` | Siyah giyoş doku, rose gold, kronograf tipi alt kadranlar (adım, pil) | `katmanlar_giyos/` |
+| Zarif | `tasarimlar/zarif_dijital.py` | İnce serif dijital saat, şampanya hairline çizgiler | `katmanlar_zarif/` |
+
+**Siyah ceket / siyah gömlek için set (klasik giyim):** Klasik (siyah varyant), Gece, Porselen, Giyoş, Zarif → karşılaştırma `onizleme/klasik_tasarimlar.png`. Renkli set (Mercan, Halka, Retro, Prizma) → `onizleme/tum_tasarimlar.png`.
 
 Hepsini üretmek için:
 
@@ -110,7 +116,8 @@ Theme Studio'da kullanım, klasik kadranla aynı mantıkta:
 - `rakam_zaman/` → saat ve dakika için iki ayrı Image Number kontrolü (Mercan: alt alta; Halka, Retro: `iki_nokta.png` ile yan yana). Retro'da `seg_zaman/`, `seg_veri/`.
 - `rakam_veri/` → adım (Steps), nabız (Heart rate), pil (Battery, son ek `yuzde.png`), gün numarası (Day).
 - `gun/` → Image Sequence, veri Week day, 0 = Pazar.
-- `halka/<ad>_000..100.png` (Halka) → Progress / Image Sequence, 11 kare; adım hedefi 10 000, nabız 180 bpm = tam, pil %.
+- `halka/<ad>_000..100.png` (Halka) ve `alt_ibre/<ad>_000..100.png` (Giyoş) → Progress / Image Sequence, 11 kare; adım hedefi 10 000, nabız 180 bpm = tam, pil %.
+- `ibre_kucuk_saniye.png` (Gece) → Pointer, veri Second, pivot **(233,322)** (küçük saniye alt kadranının merkezi).
 - `ibre_*.png`, `merkez_kapak.png` (Prizma) → Pointer kontrolleri, pivot (233,233).
 - Konumlar her scriptin başındaki `POS_*` sabitlerinde merkez koordinatı olarak yazılıdır.
 
