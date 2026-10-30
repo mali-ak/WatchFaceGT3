@@ -39,8 +39,8 @@ RENKLI = [("Mercan", "mercan_aktif", "mercan_aod"), ("Halka", "halka_aktif", "ha
 # ---- portfolyo sayfası (1920x1080)
 img = Image.new("RGBA", (1920, 1080), (16, 16, 18, 255))
 d = ImageDraw.Draw(img)
-fb, fr, fl = ortak.font("georgiab", 54), ortak.font("reg", 26), ortak.font("reg", 22)
-d.text((80, 56), "WatchFaceGT3  —  Klasik Kadran Koleksiyonu / Classic Watch Face Collection", font=fb, fill=(222, 200, 150))
+fb, fr, fl = ortak.font("georgiab", 48), ortak.font("reg", 26), ortak.font("reg", 22)
+d.text((80, 56), "WatchFaceGT3  —  Klasik Koleksiyon / Classic Collection", font=fb, fill=(222, 200, 150))
 d.text((80, 128), "Huawei Watch GT 3 · 466×466 · Her kadranda 5 veri: adım, nabız, pil, tarih, gün / 5 data types each · AOD <%4",
        font=fr, fill=(190, 190, 190))
 x0, y0, cell = 80, 200, 340
