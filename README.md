@@ -83,3 +83,37 @@ katmanlar/      üretilen PNG katmanları (aktif + aod)
 onizleme/       birleştirilmiş örnek görüntüler
 README.md       bu dosya
 ```
+
+## Diğer tasarımlar (tasarimlar/)
+
+Huawei tasarımcı başvurusu için birbirinden farklı beş kadran gerekir. Klasik kadrana ek olarak dört tasarım daha `tasarimlar/` altında, hepsi beş veri türü (adım, nabız, pil, tarih, haftanın günü) ve AOD ile:
+
+| Ad | Script | Stil | Katman klasörü |
+|---|---|---|---|
+| Klasik (M) | `build.py` | Sunburst analog, yivli altın çerçeve, 6 renk | `katmanlar/` |
+| Mercan | `tasarimlar/dijital_minimal.py` | Lacivert + mercan daire, dev dijital rakamlar | `katmanlar_mercan/` |
+| Halka | `tasarimlar/spor_halka.py` | Üç ilerleme halkası (adım/nabız/pil), spor | `katmanlar_halka/` |
+| Retro | `tasarimlar/retro_lcd.py` | Turuncu çerçeve, yeşil LCD, yedi parçalı rakam | `katmanlar_retro/` |
+| Prizma | `tasarimlar/geometrik.py` | Dört renkli dilim, koyu disk, beyaz ibreler | `katmanlar_prizma/` |
+
+Hepsini üretmek için:
+
+```bash
+python tasarimlar/hepsi.py
+```
+
+Çıktı `onizleme/<ad>_aktif.png`, `<ad>_aod.png` ve karşılaştırma `onizleme/tum_tasarimlar.png`. Ortak yardımcılar `tasarimlar/ortak.py` içinde (rakam setleri, gün adı setleri, ilerleme yayı kareleri, yedi parçalı rakam, simgeler, AOD oranı).
+
+Theme Studio'da kullanım, klasik kadranla aynı mantıkta:
+
+- `00_arka_plan.png` → Background.
+- `rakam_zaman/` → saat ve dakika için iki ayrı Image Number kontrolü (Mercan: alt alta; Halka, Retro: `iki_nokta.png` ile yan yana). Retro'da `seg_zaman/`, `seg_veri/`.
+- `rakam_veri/` → adım (Steps), nabız (Heart rate), pil (Battery, son ek `yuzde.png`), gün numarası (Day).
+- `gun/` → Image Sequence, veri Week day, 0 = Pazar.
+- `halka/<ad>_000..100.png` (Halka) → Progress / Image Sequence, 11 kare; adım hedefi 10 000, nabız 180 bpm = tam, pil %.
+- `ibre_*.png`, `merkez_kapak.png` (Prizma) → Pointer kontrolleri, pivot (233,233).
+- Konumlar her scriptin başındaki `POS_*` sabitlerinde merkez koordinatı olarak yazılıdır.
+
+### Başvuru notu
+
+İlk tasarımcı başvurusu (21 Ekim 2026) reddedildi: tek kadranın renk varyantları "benzer tasarımlar" sayıldı ve en az beş farklı, özgün tasarım istendi. Yeni başvuru paketi `tanitim/` altında üretilir (yalnız JPG/PNG/MP4, klasörsüz zip, ≤50 dosya, ≤50 MB).

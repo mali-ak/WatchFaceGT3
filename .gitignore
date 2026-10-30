@@ -3,3 +3,5 @@ __pycache__/
 *.hwt
 .DS_Store
 Thumbs.db
+tanitim/*.zip
+tanitim/zip/
